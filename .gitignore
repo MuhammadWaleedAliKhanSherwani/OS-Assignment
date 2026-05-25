@@ -1,0 +1,38 @@
+.next/
+node_modules/
+dist/
+out/
+build/
+.turbo/
+.parcel-cache/
+.cache/
+
+# Environment
+.env
+.env.*
+.env.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Mac / Windows
+.DS_Store
+Thumbs.db
+
+# Next.js build output for Vercel
+.vercel/
+
+# Misc
+coverage/
+.report/

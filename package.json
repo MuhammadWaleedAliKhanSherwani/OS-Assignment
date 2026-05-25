@@ -1,0 +1,41 @@
+{
+  "name": "os-vision",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "framer-motion": "^10.12.16",
+    "recharts": "^2.5.0",
+    "clsx": "^1.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.24",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.1.6"
+  },
+  "description": "",
+  "main": "next.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MuhammadWaleedAliKhanSherwani/OS-Assignment.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/MuhammadWaleedAliKhanSherwani/OS-Assignment/issues"
+  },
+  "homepage": "https://github.com/MuhammadWaleedAliKhanSherwani/OS-Assignment#readme"
+}
