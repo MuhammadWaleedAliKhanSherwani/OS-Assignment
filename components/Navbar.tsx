@@ -1,27 +1,25 @@
-"use client"
-import React, { useState } from 'react'
+'use client'
+
 import { motion } from 'framer-motion'
+import { Moon, Sun } from 'lucide-react'
+import { useTheme } from '../hooks/useTheme'
+import { Button } from './ui/button'
 
 export default function Navbar({ title }: { title?: string }) {
-  const [dark, setDark] = useState(true)
-
-  function toggleTheme() {
-    setDark(v => !v)
-    if (typeof window !== 'undefined') document.documentElement.classList.toggle('dark')
-  }
+  const { theme, toggle, mounted } = useTheme()
 
   return (
-    <motion.div layout className="flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gradient-to-b from-transparent to-black/20">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-600 to-indigo-500 flex items-center justify-center font-bold shadow-lg">OV</div>
-        <h3 className="text-lg font-semibold">{title ?? 'OS Vision'}</h3>
+    <motion.header
+      layout
+      className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-gray-950/60 px-4 py-3 backdrop-blur-xl lg:px-6 dark:bg-gray-950/60 light:bg-white/80"
+    >
+      <div className="flex items-center gap-3 pl-10 lg:pl-0">
+        <h3 className="text-lg font-semibold tracking-tight">{title ?? 'OS Vision'}</h3>
       </div>
-      <div className="flex items-center gap-3">
-        <button onClick={toggleTheme} className="px-3 py-1 bg-gray-800/40 hover:bg-gray-800 rounded flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full" style={{ background: dark ? '#7c5cff' : '#94a3b8' }} />
-          <span className="text-sm">{dark ? 'Dark' : 'Light'}</span>
-        </button>
-      </div>
-    </motion.div>
+      <Button variant="secondary" size="sm" onClick={toggle} disabled={!mounted}>
+        {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        {mounted ? (theme === 'dark' ? 'Light' : 'Dark') : 'Theme'}
+      </Button>
+    </motion.header>
   )
 }

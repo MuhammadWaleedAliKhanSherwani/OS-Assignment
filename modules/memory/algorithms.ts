@@ -6,84 +6,129 @@ export type MemoryStep = {
   evicted?: { page: number; frame: number } | null
 }
 
+function guardFrames(framesCount: number, refs: number[]) {
+  if (framesCount <= 0 || refs.length === 0) {
+    return { steps: [] as MemoryStep[], faults: 0 }
+  }
+  return null
+}
+
+/** Stack tracks pages in frames; index 0 = LRU, last = MRU */
+function touchStack(stack: number[], page: number) {
+  const i = stack.indexOf(page)
+  if (i >= 0) stack.splice(i, 1)
+  stack.push(page)
+}
+
 export function fifo(framesCount: number, refs: number[]): { steps: MemoryStep[]; faults: number } {
+  const guard = guardFrames(framesCount, refs)
+  if (guard) return guard
+
   const frames: (number | null)[] = Array(framesCount).fill(null)
+  /** Pages in memory, FIFO order (oldest at front) */
   const queue: number[] = []
   const steps: MemoryStep[] = []
   let faults = 0
 
   for (const r of refs) {
-    const hit = frames.includes(r)
-    let explanation = ''
-    if (hit) {
+    if (frames.includes(r)) {
       const idx = frames.indexOf(r)
-      explanation = `Page ${r} found in frame ${idx} (hit). No page fault.`
-      steps.push({ frames: [...frames], reference: r, hit, explanation, evicted: null })
+      steps.push({
+        frames: [...frames],
+        reference: r,
+        hit: true,
+        explanation: `Page ${r} found in frame ${idx} (hit). No page fault.`,
+        evicted: null
+      })
       continue
     }
 
     faults++
-    if (queue.length < framesCount) {
-      // place in next empty slot
-      const emptyIdx = frames.indexOf(null)
-      const placeIdx = emptyIdx >= 0 ? emptyIdx : queue.length
-      frames[placeIdx] = r
+    const emptyIdx = frames.indexOf(null)
+    let evicted: MemoryStep['evicted'] = null
+
+    if (emptyIdx >= 0) {
+      frames[emptyIdx] = r
       queue.push(r)
-      explanation = `Page ${r} loaded into frame ${placeIdx} (empty slot). Page fault.`
-      steps.push({ frames: [...frames], reference: r, hit, explanation, evicted: null })
+      steps.push({
+        frames: [...frames],
+        reference: r,
+        hit: false,
+        explanation: `Page ${r} loaded into frame ${emptyIdx} (empty slot). Page fault.`,
+        evicted: null
+      })
       continue
     }
 
-    const evict = queue.shift() as number
-    const idx = frames.indexOf(evict)
+    const victim = queue.shift() as number
+    const idx = frames.indexOf(victim)
     if (idx >= 0) frames[idx] = r
     queue.push(r)
-    explanation = `Page ${r} loaded into frame ${idx}, evicting page ${evict} (FIFO). Page fault.`
-    steps.push({ frames: [...frames], reference: r, hit, explanation, evicted: { page: evict, frame: idx } })
+    evicted = { page: victim, frame: idx }
+    steps.push({
+      frames: [...frames],
+      reference: r,
+      hit: false,
+      explanation: `Page ${r} loaded into frame ${idx}, evicting page ${victim} (FIFO). Page fault.`,
+      evicted
+    })
   }
 
   return { steps, faults }
 }
 
 export function lru(framesCount: number, refs: number[]): { steps: MemoryStep[]; faults: number } {
+  const guard = guardFrames(framesCount, refs)
+  if (guard) return guard
+
   const frames: (number | null)[] = Array(framesCount).fill(null)
-  const recent: number[] = [] // most recent at end
+  const stack: number[] = []
   const steps: MemoryStep[] = []
   let faults = 0
 
   for (const r of refs) {
-    const hit = frames.includes(r)
-    let explanation = ''
-    if (!hit) {
-      faults++
-      if (recent.length < framesCount) {
-        const empty = frames.indexOf(null)
-        const place = empty >= 0 ? empty : frames.indexOf(null)
-        if (place >= 0) frames[place] = r
-        recent.push(r)
-        explanation = `Page ${r} loaded into frame ${place} (empty slot). Page fault.`
-        steps.push({ frames: [...frames], reference: r, hit, explanation, evicted: null })
-        continue
-      } else {
-        const lru = recent.shift() as number
-        const idx = frames.indexOf(lru)
-        if (idx >= 0) frames[idx] = r
-        recent.push(r)
-        explanation = `Page ${r} loaded into frame ${idx}; evicted least-recently-used page ${lru} (LRU). Page fault.`
-        steps.push({ frames: [...frames], reference: r, hit, explanation, evicted: { page: lru, frame: idx } })
-        continue
-      }
+    if (frames.includes(r)) {
+      touchStack(stack, r)
+      const idx = frames.indexOf(r)
+      steps.push({
+        frames: [...frames],
+        reference: r,
+        hit: true,
+        explanation: `Page ${r} found in frame ${idx} (hit). Marked most-recently-used.`,
+        evicted: null
+      })
+      continue
     }
 
-    // move to most recent
-    const idxR = recent.indexOf(r)
-    if (idxR >= 0) {
-      recent.splice(idxR, 1)
-      recent.push(r)
+    faults++
+    const emptyIdx = frames.indexOf(null)
+    let evicted: MemoryStep['evicted'] = null
+
+    if (emptyIdx >= 0) {
+      frames[emptyIdx] = r
+      touchStack(stack, r)
+      steps.push({
+        frames: [...frames],
+        reference: r,
+        hit: false,
+        explanation: `Page ${r} loaded into frame ${emptyIdx} (empty slot). Page fault.`,
+        evicted: null
+      })
+      continue
     }
-    const idx = frames.indexOf(r)
-    explanation = `Page ${r} is already in frame ${idx} (hit). Marked most-recently-used.`
-    steps.push({ frames: [...frames], reference: r, hit, explanation, evicted: null })
+
+    const victim = stack.shift() as number
+    const idx = frames.indexOf(victim)
+    if (idx >= 0) frames[idx] = r
+    touchStack(stack, r)
+    evicted = { page: victim, frame: idx }
+    steps.push({
+      frames: [...frames],
+      reference: r,
+      hit: false,
+      explanation: `Page ${r} loaded into frame ${idx}; evicted least-recently-used page ${victim} (LRU). Page fault.`,
+      evicted
+    })
   }
 
   return { steps, faults }

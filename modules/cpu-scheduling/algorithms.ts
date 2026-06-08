@@ -1,14 +1,23 @@
 import { Process, AlgorithmResult, ScheduledSegment } from '../../types'
 
 function computeMetrics(segments: ScheduledSegment[], procs: Process[]): AlgorithmResult {
+  if (procs.length === 0) {
+    return {
+      segments: [],
+      waitingTimes: {},
+      turnaroundTimes: {},
+      avgWaitingTime: 0,
+      avgTurnaroundTime: 0,
+      cpuUtilization: 0
+    }
+  }
+
   const waitingTimes: Record<string, number> = {}
   const turnaroundTimes: Record<string, number> = {}
 
   const finishTimes: Record<string, number> = {}
-  const startTimes: Record<string, number> = {}
 
   for (const s of segments) {
-    if (!(s.pid in startTimes)) startTimes[s.pid] = s.start
     finishTimes[s.pid] = s.end
   }
 
@@ -16,10 +25,11 @@ function computeMetrics(segments: ScheduledSegment[], procs: Process[]): Algorit
   procs.forEach(p => (totalBurst += p.burst))
 
   for (const p of procs) {
-    const start = startTimes[p.id] ?? p.arrival
-    const finish = finishTimes[p.id] ?? start
-    waitingTimes[p.id] = Math.max(0, start - p.arrival)
-    turnaroundTimes[p.id] = finish - p.arrival
+    const finish = finishTimes[p.id] ?? p.arrival
+    const turnaround = finish - p.arrival
+    turnaroundTimes[p.id] = turnaround
+    // Waiting = turnaround - burst (correct for preemptive and non-preemptive)
+    waitingTimes[p.id] = Math.max(0, turnaround - p.burst)
   }
 
   const avgWaiting = Object.values(waitingTimes).reduce((a, b) => a + b, 0) / procs.length
@@ -68,7 +78,7 @@ export function sjf(processes: Process[]): AlgorithmResult {
       time = Math.max(time, next.arrival)
       continue
     }
-    ready.sort((a, b) => a.burst - b.burst)
+    ready.sort((a, b) => a.burst - b.burst || a.arrival - b.arrival || a.id.localeCompare(b.id))
     const p = ready[0]
     const start = time
     time += p.burst
@@ -81,6 +91,7 @@ export function sjf(processes: Process[]): AlgorithmResult {
 
 export function roundRobin(processes: Process[], quantum: number): AlgorithmResult {
   if (quantum <= 0) quantum = 1
+  if (processes.length === 0) return computeMetrics([], [])
   const procs = [...processes].map(p => ({ ...p }))
   const remaining: Record<string, number> = {}
   for (const p of procs) remaining[p.id] = p.burst
@@ -100,9 +111,10 @@ export function roundRobin(processes: Process[], quantum: number): AlgorithmResu
     }
 
     if (queue.length === 0) {
-      // next arrival
-      const next = procs.filter(p => remaining[p.id] > 0 && !arrived.has(p.id)).reduce((a, b) => (a.arrival < b.arrival ? a : b), procs[0])
-      time = Math.max(time, next.arrival)
+      const pending = procs.filter(p => remaining[p.id] > 0 && p.arrival > time)
+      if (pending.length === 0) break
+      const next = pending.reduce((a, b) => (a.arrival < b.arrival ? a : b))
+      time = next.arrival
       continue
     }
 
@@ -144,7 +156,10 @@ export function priorityScheduling(processes: Process[]): AlgorithmResult {
       time = Math.max(time, next.arrival)
       continue
     }
-    ready.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
+    ready.sort(
+      (a, b) =>
+        (a.priority ?? 0) - (b.priority ?? 0) || a.arrival - b.arrival || a.id.localeCompare(b.id)
+    )
     const p = ready[0]
     const start = time
     time += p.burst
